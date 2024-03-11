@@ -1,0 +1,123 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Program.Sub.Definition.DefaultArgs("ProcessDir","dir")
+Program.Sub.Definition.DefaultArgs("ProcessSubDir","Dir*!*SubFolder*!*LinkID*!*GroupID")
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+V.Local.sDir.Declare(String)
+V.Local.sDirs.Declare(String)
+V.Local.iC.Declare(Long)
+
+V.Local.bRet.Declare(Boolean)
+
+
+F.Intrinsic.UI.FolderBrowser("Please Select Starting Folder",V.Local.sDir)
+F.Intrinsic.File.DirExists(V.Local.sDir,V.Local.bRet)
+F.ODBC.Connection!conx.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+
+
+F.Intrinsic.Control.If(V.local.bRet,=,True)
+	F.Intrinsic.UI.InvokeWaitDialog("Processing Folder")
+	F.Intrinsic.String.Concat(V.Local.sDir,"\",V.Local.sDir)
+	F.Intrinsic.File.GetFileList(V.Local.sDir,16,V.Local.sDirs)
+	F.Intrinsic.string.Split(V.Local.sDirs,":",V.Local.sDirs)
+	F.Intrinsic.Debug.Stop
+	F.Intrinsic.control.For(V.Local.iC,0,V.Local.sDirs.UBound,1)
+		F.Intrinsic.Control.If(V.Local.sDirs(v.Local.iC),<>,".")
+			F.Intrinsic.Control.If(V.Local.sDirs(v.Local.iC),<>,"..")
+				F.Intrinsic.String.Concat(V.Local.sDir,V.local.sDirs(v.Local.ic),V.Local.sDirs(v.Local.ic))
+				F.Intrinsic.File.Exists(V.Local.sDirs(v.Local.iC),V.Local.bRet)
+				F.Intrinsic.Control.If(V.Local.bRet,=,False)
+					F.Intrinsic.Control.CallSub(Processdir,"dir",V.Local.sDirs(v.Local.iC))
+				F.Intrinsic.Control.endif
+			F.Intrinsic.Control.EndIf
+		F.Intrinsic.Control.endif
+	F.Intrinsic.Control.Next(V.Local.iC)
+	F.Intrinsic.UI.CloseWaitDialog
+
+F.Intrinsic.Control.EndIf
+F.ODBC.Connection!conx.Close
+F.Intrinsic.Control.end
+
+
+Program.Sub.Main.End
+
+Program.Sub.ProcessDir.Start
+V.Local.sRouter.Declare(String)
+V.Local.sDir.Declare(String)
+V.Local.bRet.Declare(Boolean)
+V.Local.sSubFolder.Declare(String)
+V.Local.iLinkID.Declare(Long)
+V.Local.iDocID.Declare(Long)
+V.Local.iPos.Declare(Long)
+V.Local.sQuery.Declare(String)
+
+V.Local.sDir.Set(V.Args.dir)
+F.Intrinsic.String.Instrrev(V.Local.sDir,"\",V.Local.iPos)
+
+F.Intrinsic.Math.add(V.Local.iPos,1,V.Local.ipos)
+F.Intrinsic.String.Mid(V.Local.sDir,V.Local.iPos,V.Local.sRouter)
+
+F.Intrinsic.String.Instr(V.local.sRouter,",",V.Local.iPos)
+F.Intrinsic.Control.If(V.Local.iPos,<>,0)
+	F.Intrinsic.Math.Sub(V.Local.iPos,1,V.Local.iPos)
+	F.Intrinsic.String.Left(V.local.sRouter,V.Local.iPos,V.Local.sRouter)
+F.Intrinsic.Control.EndIf
+'Add check and warn if part now found in inventory
+V.Local.sRouter.Set(V.Passed.000007,10210)
+V.Local.sRouter.Set(V.Passed.000007,10220)
+V.Local.sRouter.Set(V.Passed.000007,10230)
+
+F.Intrinsic.String.Concat("SELECT PART FROM INVENTORY_MSTR WHERE PART = '",V.Local.sRouter,"'",V.Local.sQuery)
+
+F.ODBC.Connection!conx.OpenRecordsetRO("rst",V.Local.sQuery)
+F.Intrinsic.Control.If(V.ODBC.conx!rst.EOF,=,True)
+	F.Intrinsic.String.Concat("Part not found: ",V.Local.sRouter,V.Local.sQuery)
+	F.Intrinsic.UI.Msgbox(V.Local.sQuery)
+	F.ODBC.conx!rst.Close
+	F.Intrinsic.Control.exitsub
+F.Intrinsic.Control.EndIf
+F.ODBC.conx!rst.Close
+
+
+F.Global.DocumentControl.CreateReference(V.Local.sRouter,30,V.Local.iLinkID)
+F.Intrinsic.Control.CallSub(Processsubdir,"Dir",V.Local.sDir,"LinkID",V.Local.iLinkID,"SubFolder","GMMDATA\CAD-AND-PRINTS","groupid",1)
+F.Intrinsic.Control.CallSub(Processsubdir,"Dir",V.Local.sDir,"LinkID",V.Local.iLinkID,"SubFolder","GMMData\MachineData","groupid",2)
+F.Intrinsic.Control.CallSub(Processsubdir,"Dir",V.Local.sDir,"LinkID",V.Local.iLinkID,"SubFolder","CustomerData\CustomerCad","groupid",3)
+F.Intrinsic.Control.CallSub(Processsubdir,"Dir",V.Local.sDir,"LinkID",V.Local.iLinkID,"SubFolder","CustomerData\CustomerPrints","groupid",4)
+F.Intrinsic.Control.CallSub(Processsubdir,"Dir",V.Local.sDir,"LinkID",V.Local.iLinkID,"SubFolder","QualityDocuments\InspectionSheets","groupid",5)
+
+Program.Sub.ProcessDir.End
+
+Program.Sub.ProcessSubDir.Start
+V.Local.iC.Declare(Long)
+V.Local.sSubDir.Declare(String)
+V.Local.sDoc.Declare(String)
+V.Local.bRet.Declare(Boolean)
+
+F.Intrinsic.String.Concat(V.Args.dir,"\",V.Args.subfolder,"\",V.Local.sSubDir)
+F.Intrinsic.UI.ChangeWaitStatus(V.local.ssubDir,V.args.groupid,1,5)
+F.Intrinsic.File.DirExists(V.Local.ssubdir,V.Local.bRet)
+F.Intrinsic.Control.If(V.Local.bRet,=,True)
+	F.Intrinsic.File.GetFileList(V.Local.sSubDir,V.Local.sSubDir)
+	F.Intrinsic.String.Split(V.Local.sSubDir,":",V.Local.sSubDir)
+
+	F.Intrinsic.Control.For(V.Local.iC,0,V.Local.sSubDir.UBound,1)
+
+		F.Intrinsic.String.Concat(V.Args.dir,"\",V.Args.subfolder,"\",V.Local.sSubDir(v.Local.iC),V.Local.sDoc)
+		F.Intrinsic.File.Exists(V.Local.sDoc,V.Local.bRet)
+		F.Intrinsic.control.If(V.Local.bRet,=,True)
+			F.Intrinsic.File.GetUNCName(V.Local.sDoc,V.Local.sDoc)
+			F.Intrinsic.String.Replace(V.Local.sDoc,"'","''",V.Local.sDoc)
+			F.Global.DocumentControl.AddDocument(V.Args.LinkID,V.Local.sDoc,"",V.args.groupid,"")
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.next(V.Local.iC)
+F.Intrinsic.Control.EndIf
+
+Program.Sub.ProcessSubDir.End
+
+
